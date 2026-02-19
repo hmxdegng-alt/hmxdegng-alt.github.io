@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>DOXX</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #181818;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            position: relative;
+        }
+        /* (Reproductor eliminado - estilos limpiados) */
+        /* Floating control buttons (top-right) */
+        #float-controls {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 9999;
+            display: flex;
+            gap: 8px;
+            pointer-events: auto;
+        }
+        #float-controls button {
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border: 1px solid #4fc3f7;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        #float-controls button:hover { opacity: 0.95; }
+
+        /* Messages top-left */
+        #message-container {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+        }
+        .m-msg {
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95em;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+            opacity: 0;
+            transform: translateY(-6px);
+            transition: opacity 260ms ease, transform 260ms ease;
+        }
+        .m-msg.show { opacity: 1; transform: translateY(0); }
+        /* Leave a left gutter for the message stack; content is positioned to the right */
+        #content {
+            position: absolute;
+            top: 0;
+            left: 360px; /* gutter width reserved for messages */
+            z-index: 1;
+            width: calc(100vw - 360px);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center; /* center the info panel inside the content area */
+        }
+        #info-box {
+            background: #222d;
+            padding: 32px 32px 24px 32px;
+            border-radius: 20px;
+            box-shadow: 0 0 30px #0008;
+            min-width: 340px;
+            max-width: 98vw;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            margin-bottom: 18px;
+            letter-spacing: 2px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 18px 0;
+        }
+        li {
+            margin-bottom: 12px;
+            font-size: 1.13em;
+            word-break: break-all;
+        }
+        .label {
+            color: #4fc3f7;
+            font-weight: bold;
+        }
+        #history-section {
+            margin: 18px 0;
+        }
+        #history-select {
+            width: 100%;
+            max-width: 420px;
+            font-size: 1em;
+            padding: 4px;
+            border-radius: 6px;
+            margin-top: 6px;
+            margin-bottom: 6px;
+        }
+        #hardware-list {
+            margin-top: 8px;
+        }
+        #map-link {
+            margin-top: 18px;
+            text-align: center;
+        }
+        a {
+            color: #4fc3f7;
+            font-size: 1.1em;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        #perm-section {
+            margin-top: 22px;
+            text-align: center;
+        }
+        #perm-section button {
+            background: #4fc3f7;
+            color: #181818;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-size: 1.1em;
+            cursor: pointer;
+            margin: 0 8px;
+        }
+        #perm-result {
+            margin-top: 10px;
+            font-size: 1em;
+        }
+        @media (max-width: 600px) {
+            #info-box {
+                padding: 12px 4vw 12px 4vw;
+                min-width: 0;
+            }
+            h1 { font-size: 1.3em; }
+            li { font-size: 1em; }
+        }
+
+        /* For medium/small screens, remove left gutter so content uses full width */
+        @media (max-width: 900px) {
+            /* On smaller screens remove the gutter and let content center normally */
+            #content {
+                position: relative;
+                left: 0;
+                width: 100vw;
+                padding-left: 12px;
+                justify-content: center;
+            }
+            #message-container { left: 8px; top: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- background video removed -->
+    <div id="float-controls">
+        <button id="close-btn">Aceptar destino</button>
+    </div>
+
+    <div id="message-container" aria-live="polite" aria-atomic="true"></div>
+    <div id="content">
+        <div id="info-box">
+            <h1>DOXX</h1>
+            <ul id="info-list">
+                <li><span class="label">IPs:</span> <span id="ips">Cargando...</span></li>
+                <li><span class="label">ISP:</span> <span id="isp">Cargando...</span></li>
+                <li><span class="label">Plataforma:</span> <span id="platform"></span></li>
+                <li><span class="label">Sistema operativo:</span> <span id="os"></span></li>
+                <li><span class="label">Navegador:</span> <span id="browser"></span></li>
+                <li><span class="label">Resolución:</span> <span id="resolution"></span></li>
+                <li><span class="label">Tamaño pantalla:</span> <span id="screensize"></span></li>
+                <li><span class="label">Idioma preferido:</span> <span id="lang"></span></li>
+                <li><span class="label">Fecha y hora:</span> <span id="datetime"></span></li>
+                <li><span class="label">Zona horaria:</span> <span id="timezone"></span></li>
+            </ul>
+            <div id="history-section">
+                <span class="label">Historial de accesos:</span>
+                <select id="history-select" size="4" style="width:100%;"></select>
+            </div>
+            <div>
+                <span class="label">Hardware:</span>
+                <ul id="hardware-list"></ul>
+            </div>
+            <div id="map-link"></div>
+            <div id="perm-section">
+                <div><span class="label">Permiso cámara/micrófono:</span></div>
+                <button id="perm-btn">Solicitar permisos</button>
+                <div id="perm-result"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Close button and sequential messages (no video/player code)
+        // Configuración de mensajes (edítala para cambiar los textos o tiempos)
+        const MESSAGE_START_DELAY = 3000; // ms antes del primer mensaje
+        const MESSAGE_INTERVAL = 1000; // ms entre mensajes
+        const MESSAGES = [
+            'Información obtenida ✔',
+            'Virus activo ✔',
+            'Aplicación añadida al arranque ✔',
+            'Compartiendo pantalla ✔',
+            'Critical: Kernel module integrity check failed ✘'
+        ];
+
+        document.addEventListener('DOMContentLoaded', function(){
+            // Close button (may be blocked if tab not opened by script)
+            var closeBtn = document.getElementById('close-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function(){
+                    try { window.close(); } catch(e) { /* ignore */ }
+                    setTimeout(function(){
+                        try { window.open('','_self'); window.close(); } catch(e) { location.href = 'about:blank'; }
+                    }, 150);
+                });
+            }
+
+            // Messages: start after configured delay, show each message separated by configured interval
+            (function showSequentialMessages(){
+                var container = document.getElementById('message-container');
+                if (!container) return;
+                setTimeout(function(){
+                    var count = Math.min(MESSAGES.length, 5); // mostramos hasta 5 mensajes
+                    for (let i = 0; i < count; i++) {
+                        setTimeout(function(){
+                            var d = document.createElement('div');
+                            d.className = 'm-msg';
+                            d.textContent = MESSAGES[i] || ('PLACEHOLDER ' + (i+1));
+                            container.appendChild(d);
+                            requestAnimationFrame(function(){ d.classList.add('show'); });
+                        }, i * MESSAGE_INTERVAL);
+                    }
+                }, MESSAGE_START_DELAY);
+            })();
+        });
+
+        // IPs públicas y privadas
+        function getLocalIPs(callback) {
+            let ips = [];
+            let RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+            if (!RTCPeerConnection) {
+                callback([]);
+                return;
+            }
+            let pc = new RTCPeerConnection({iceServers:[]});
+            pc.createDataChannel("");
+            pc.createOffer().then(offer => pc.setLocalDescription(offer));
+            pc.onicecandidate = function(e) {
+                if (!e.candidate) {
+                    callback(ips);
+                    return;
+                }
+                let ipMatch = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
+                if (ipMatch) {
+                    let ip = ipMatch[1];
+                    if (!ips.includes(ip)) ips.push(ip);
+                }
+            };
+        }
+
+        // Info de navegador y sistema
+        function getBrowserInfo() {
+            let ua = navigator.userAgent;
+            let browser = "Desconocido";
+            if (/chrome|crios|crmo/i.test(ua)) browser = "Chrome";
+            else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
+            else if (/safari/i.test(ua)) browser = "Safari";
+            else if (/edg/i.test(ua)) browser = "Edge";
+            else if (/opr\//i.test(ua)) browser = "Opera";
+            else if (/msie|trident/i.test(ua)) browser = "Internet Explorer";
+            return browser;
+        }
+        function getOS() {
+            let ua = navigator.userAgent;
+            if (/windows/i.test(ua)) return "Windows";
+            if (/android/i.test(ua)) return "Android";
+            if (/linux/i.test(ua)) return "Linux";
+            if (/iphone|ipad|ipod/i.test(ua)) return "iOS";
+            if (/mac/i.test(ua)) return "MacOS";
+            return "Desconocido";
+        }
+        function getPlatform() {
+            let p = navigator.userAgent.toLowerCase();
+            if (/mobile|android|iphone|ipad|ipod/.test(p)) return "Móvil";
+            if (/tablet/.test(p)) return "Tablet";
+            return "Ordenador";
+        }
+
+        // Resolución y pantalla
+        function updateScreenInfo() {
+            document.getElementById('resolution').textContent = `${window.innerWidth}x${window.innerHeight}`;
+            document.getElementById('screensize').textContent = `${screen.width}x${screen.height}`;
+        }
+        window.addEventListener('resize', updateScreenInfo);
+
+        // Idioma
+        document.getElementById('lang').textContent = navigator.language || navigator.userLanguage;
+
+        // Fecha, hora y zona
+        function getDateTime() {
+            let now = new Date();
+            let date = now.toLocaleDateString();
+            let time = now.toLocaleTimeString();
+            let tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            document.getElementById('datetime').textContent = `${date} ${time}`;
+            document.getElementById('timezone').textContent = tz;
+            return {date, time, tz, iso: now.toISOString()};
+        }
+        setInterval(getDateTime, 1000);
+        getDateTime();
+
+        // Hardware
+        function getHardwareSpecs() {
+            let hw = [];
+            if (navigator.hardwareConcurrency) hw.push(`Núcleos CPU: ${navigator.hardwareConcurrency}`);
+            if (navigator.deviceMemory) hw.push(`RAM estimada: ${navigator.deviceMemory} GB`);
+            if (navigator.maxTouchPoints) hw.push(`Puntos táctiles: ${navigator.maxTouchPoints}`);
+            if (navigator.userAgentData && navigator.userAgentData.brands) {
+                hw.push("UserAgentData: " + JSON.stringify(navigator.userAgentData.brands));
+            }
+            if (window.GPU) hw.push(`GPU: ${window.GPU}`);
+            return hw;
+        }
+        function renderHardware() {
+            let hw = getHardwareSpecs();
+            let ul = document.getElementById('hardware-list');
+            ul.innerHTML = "";
+            if (hw.length === 0) ul.innerHTML = "<li>No disponible</li>";
+            else hw.forEach(x => { let li = document.createElement('li'); li.textContent = x; ul.appendChild(li); });
+        }
+        renderHardware();
+
+        // Browser, OS, Platform
+        document.getElementById('browser').textContent = getBrowserInfo();
+        document.getElementById('os').textContent = getOS();
+        document.getElementById('platform').textContent = getPlatform();
+        updateScreenInfo();
+
+        // IP pública y privada
+        let allIPs = [];
+        let publicIP = "";
+        fetch('https://api.ipify.org?format=json')
+            .then(response => response.json())
+            .then(data => {
+                publicIP = data.ip;
+                allIPs.push(publicIP);
+                document.getElementById('ips').textContent = allIPs.join(', ');
+                // ISP info
+                fetch('https://ipapi.co/' + publicIP + '/json/')
+                    .then(resp => resp.json())
+                    .then(loc => {
+                        let isp = [];
+                        if (loc.org) isp.push(loc.org);
+                        if (loc.asn) isp.push("ASN: " + loc.asn);
+                        if (loc.country_name) isp.push(loc.country_name);
+                        if (loc.city) isp.push(loc.city);
+                        if (loc.region) isp.push(loc.region);
+                        document.getElementById('isp').textContent = isp.join(', ') || "No disponible";
+                        // Mapa
+                        if (loc.latitude && loc.longitude) {
+                            const url = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+                            document.getElementById('map-link').innerHTML =
+                                `<a href="${url}" target="_blank">Ver ubicación precisa en Google Maps</a>`;
+                        } else {
+                            document.getElementById('map-link').textContent =
+                                "No se pudo obtener la ubicación de la IP.";
+                        }
+                    })
+                    .catch(() => {
+                        document.getElementById('isp').textContent = "No disponible";
+                        document.getElementById('map-link').textContent =
+                            "No se pudo obtener la ubicación de la IP.";
+                    });
+            })
+            .catch(() => {
+                document.getElementById('ips').textContent = "No se pudo obtener la IP pública";
+                document.getElementById('isp').textContent = "No disponible";
+            });
+
+        // Local IPs
+        getLocalIPs(function(ips) {
+            ips.forEach(ip => {
+                if (!allIPs.includes(ip)) allIPs.push(ip);
+            });
+            document.getElementById('ips').textContent = allIPs.join(', ');
+        });
+
+        // Historial de accesos
+        function saveHistory() {
+            let history = JSON.parse(localStorage.getItem('doxx_history') || "[]");
+            let now = new Date();
+            let entry = {
+                date: now.toLocaleDateString(),
+                time: now.toLocaleTimeString(),
+                iso: now.toISOString(),
+                tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                ip: publicIP || "",
+                browser: getBrowserInfo(),
+                os: getOS(),
+                platform: getPlatform(),
+                lang: navigator.language || navigator.userLanguage,
+                resolution: `${window.innerWidth}x${window.innerHeight}`,
+                screensize: `${screen.width}x${screen.height}`
+            };
+            history.unshift(entry);
+            if (history.length > 30) history.length = 30;
+            localStorage.setItem('DOXX_history', JSON.stringify(history));
+        }
+        function renderHistory() {
+            let history = JSON.parse(localStorage.getItem('doxx_history') || "[]");
+            let sel = document.getElementById('history-select');
+            sel.innerHTML = "";
+            history.forEach((h, i) => {
+                let opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = `${h.date} ${h.time} (${h.tz}) - IP: ${h.ip}`;
+                sel.appendChild(opt);
+            });
+            sel.onchange = function() {
+                let idx = this.value;
+                let h = history[idx];
+                if (!h) return;
+                alert(
+                    `Fecha: ${h.date} ${h.time}\n` +
+                    `Zona: ${h.tz}\n` +
+                    `IP: ${h.ip}\n` +
+                    `Navegador: ${h.browser}\n` +
+                    `SO: ${h.os}\n` +
+                    `Plataforma: ${h.platform}\n` +
+                    `Idioma: ${h.lang}\n` +
+                    `Resolución: ${h.resolution}\n` +
+                    `Pantalla: ${h.screensize}`
+                );
+            };
+        }
+        setTimeout(() => { saveHistory(); renderHistory(); }, 1200);
+
+        // Permiso cámara/micrófono
+        document.getElementById('perm-btn').onclick = function() {
+            navigator.mediaDevices.getUserMedia({video:true, audio:true})
+                .then(stream => {
+                    document.getElementById('perm-result').textContent = "Permiso concedido.";
+                    stream.getTracks().forEach(track => track.stop());
+                })
+                .catch(err => {
+                    document.getElementById('perm-result').textContent = "Permiso denegado o no disponible.";
+                });
+        };
+    </script>
+</body>
+</html>
